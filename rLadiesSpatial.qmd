@@ -1,0 +1,940 @@
+---
+title: "Dealing with Spatial Data using R"
+author: "Alessia Calafiore"
+format: 
+  rladies-revealjs:
+    footer: "[R-Ladies](https://rladies.org/) theme for [Quarto Presentations](https://quarto.org/docs/presentations/revealjs/index.html). Code available on [GitHub](https://github.com/beatrizmilz/quarto-rladies-theme)."
+incremental: false
+embed-resources: true
+---
+
+## Overview
+
+::: r-fit-text
+-   Introducing R and Spatial Data
+
+-   Mapping Gender Inequality in Scotland
+:::
+
+## R and Spatial Data
+
+![](logos.jpg){.absolute top="50" left="50" height="400"}
+
+## Simple Features for R (the sf package)
+
+![](sf.gif){.absolute top="100" left="100" height="300"}
+
+## 
+
+From [Edzer Pebesma](https://r-spatial.github.io/sf/articles/sf1.html) vignette:
+
+. . .
+
+-   **sf** implements a widely used standard in spatial databases that describes how objects in the real world can be represented in computers;
+
+. . .
+
+-   A feature can be thought of as a thing, or an object in the real world, such as a building or a tree.
+
+. . .
+
+-   Features have a geometry describing where on Earth the feature is located, and they have attributes, which describe other properties.
+
+## 
+
+-   The most common simple features for spatial analysis are POINTS, LINESTRING, POLYGONS
+
+. . .
+
+Once installed sf can be loaded as any other R library
+
+```{r echo=TRUE}
+library(sf)
+```
+
+## Now let's load some spatial data
+
+```{r echo = TRUE}
+boundaries <- st_read("scottish_wards.gpkg")
+```
+
+```{r echo = TRUE}
+class(boundaries)
+```
+
+## Coordinate Reference Systems
+
+Coordinates correspond to specific location on the Earth's surface on the basis of a **coordinate reference system (CRS)**. A common way to identify a CRS is through its **EPSG code**.
+
+```{r echo=TRUE}
+st_crs(boundaries)[[1]] #EPSG = 27700
+```
+
+CRS can be transformed with sf.
+
+```{r echo=TRUE}
+boundaries_WGS84 <- st_transform(boundaries, 4326)
+st_crs(boundaries_WGS84)[[1]]
+```
+
+## Geometry operations (some)
+
+::: columns
+::: {.column width="50%"}
+**On a single object**
+
+-   st_centroids()
+
+-   st_buffer()
+
+-   st_simplify()
+
+-   st_union()
+:::
+
+::: {.column width="50%"}
+**Between two objects**
+
+-   st_intersection()
+
+-   st_difference()
+
+-   st_union()
+:::
+:::
+
+## Spatial Join
+
+Spatial joins are useful when you want to **join attributes** of one sf obj with an other object based on some geometry operation.
+
+```{r echo=TRUE}
+pts <- st_sample(boundaries[1:2, ], 10) # creates sample points within boundaries
+pts <- st_as_sf(pts) #transform it into an sf object 
+names(pts)
+names(boundaries[1:2, ])
+```
+
+As you can see there is no attribute we could use to join these two datasets.
+
+## but can we do it spatially?
+
+```{r}
+plot(st_geometry(boundaries[1:2,]))
+plot(pts, add=TRUE)
+```
+
+## Let's try then
+
+```{r echo=TRUE}
+
+pts_data<-st_join(pts, boundaries[1:2,])
+head(pts_data)
+
+```
+
+# Mapping Gender Inequality in Scotland {background-color="#562457"}
+
+## Gender Pay Gap and Gender Inequality
+
+-   Broadly, the **Gender Pay Gap** is the **difference in pay between women and men**.
+
+-   Globally, women on average, are paid **about 20 per cent less** than men (ILO).
+
+-   Gender **inequality in job opportunities and career**.
+
+## Measuring Gender Inequality in Scotland
+
+***Socio-economic Classification (SeC - Scottish Census 2011)***
+
+::: columns
+::: {.column width="50%"}
+**C1** - Higher managerial, administrative and professional occupations
+
+**C2** - Lower managerial, administrative and professional occupations
+
+**C3** - Intermediate occupations
+
+**C4** - Small employers and own account workers
+:::
+
+::: {.column width="50%"}
+**C5** - Lower supervisory and technical occupations
+
+**C6** - Semi-routine occupations
+
+**C7** - Routine occupations
+
+**C8** - Never worked and long-term unemployed
+:::
+:::
+
+## Let's load some data
+
+```{r echo=TRUE, message=FALSE}
+data <- read.csv("LC6121SC.csv")
+names(data)
+```
+
+With these data let's create a simple *equality score* (E) to compare the likelihood of belonging to each of these SeC between females and males.
+
+## A bit of data wrangling
+
+```{r echo=TRUE, warning=FALSE}
+library(tidyverse)
+
+ward_data <- data %>%
+  #filter out country level data
+  filter(Name != "Scotland") %>%
+  #reshape the data
+  pivot_wider(id_cols = Name,
+              names_from = Gender,
+              values_from = starts_with("C")) %>%
+  #compute the score
+  mutate(
+    C1_gap = ((C1_Females / C1_All) / (C1_Males / C1_All)) * 100,
+    C2_gap = ((C2_Females / C2_All) / (C2_Males / C2_All)) * 100,
+    C3_gap = ((C3_Females / C3_All) / (C3_Males / C3_All)) * 100,
+    C4_gap = ((C4_Females / C4_All) / (C4_Males / C4_All)) * 100,
+    C5_gap = ((C5_Females / C5_All) / (C5_Males / C5_All)) * 100,
+    C6_gap = ((C6_Females / C6_All) / (C6_Males / C6_All)) * 100,
+    C7_gap = ((C7_Females / C7_All) / (C7_Males / C7_All)) * 100,
+    C8_gap = ((C8_Females / C8_All) / (C8_Males / C8_All)) * 100
+) %>%
+select(Name, contains("gap"))
+
+```
+
+## How to interpret the score (E)
+
+-   If E = 100 females and males have the same likelihood to be in a SeC;
+
+-   If E \> 100 it is more likely for females than males to be in a SeC;
+
+-   if E \< 100 it is more likely for males than females to be in a SeC;
+
+## Let's get some descriptive stats
+
+```{r echo=TRUE}
+
+ward_data %>%
+  pivot_longer(cols = contains("gap"),
+               names_to = "SeC",
+               values_to = "Gap") %>%
+  group_by(SeC) %>%
+  summarise(
+    Min = min(Gap),
+    Max = max(Gap),
+    Mean = mean(Gap),
+    SD = sd(Gap)
+  )
+```
+
+## Static maps with ggplot2
+
+-   ggplot is a widely used R library, now over 10 years old
+
+. . .
+
+-   It is used to make any type of plot, including maps !!!
+
+. . .
+
+-   Browse the [R gallery](https://r-graph-gallery.com/) to find out more
+
+. . .
+
+# Let's make some maps !!! {background-color="#562457"}
+
+## First we need to link the boundaries with the data
+
+```{r echo=TRUE}
+names(boundaries)
+names(ward_data)
+```
+
+Let's join these two datasets
+
+```{r echo=TRUE}
+ward_data_geo <- boundaries %>%
+  inner_join(ward_data, by = c("Name"="Name"))
+names(ward_data_geo)
+```
+
+## Now we can make our first map
+
+```{r echo=TRUE}
+
+ggplot()+
+  geom_sf(aes(fill = C1_gap),data = ward_data_geo)
+```
+
+## Let's make some changes
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "1-4"
+
+ggplot()+
+  geom_sf(aes(fill = C1_gap),
+          data = ward_data_geo,
+          colour = "NA") +
+  #change color palette
+  scale_fill_gradientn( 
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  #add a scale bar
+  ggspatial::annotation_scale( 
+    location = "bl",
+    bar_cols = c("grey60", "white")
+    ) +
+  #change text 
+  labs(fill = "Women every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Scotland")+
+  #customize theme
+  theme_void() + 
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "5-13"
+
+ggplot()+
+  geom_sf(aes(fill = C1_gap),
+          data = ward_data_geo,
+          colour = "NA") +
+  #change color palette
+  scale_fill_gradientn( 
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  #add a scale bar
+  ggspatial::annotation_scale(  
+    location = "bl",
+    bar_cols = c("grey60", "white")
+    ) +
+  #change text 
+  labs(fill = "Women every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Scotland")+
+  #customize theme
+  theme_void() + 
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "14-25"
+
+ggplot()+
+  geom_sf(aes(fill = C1_gap),
+          data = ward_data_geo,
+          colour = "NA") +
+  #change color palette
+  scale_fill_gradientn( 
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  #add a scale bar
+  ggspatial::annotation_scale(  
+    location = "bl",
+    bar_cols = c("grey60", "white")
+    ) +
+  #change text 
+  labs(fill = "Women every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Scotland")+
+  #customize theme
+  theme_void() + 
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  
+
+```
+
+## and see the result
+
+```{r echo=FALSE}
+
+ggplot()+
+  geom_sf(aes(fill = C1_gap),
+          data = ward_data_geo,
+          colour = "NA") +
+  #change color palette
+  scale_fill_gradientn( 
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  #change the background
+  theme_void() + 
+  #add a scale bar
+  ggspatial::annotation_scale(  
+    location = "bl",
+    bar_cols = c("grey60", "white")
+    ) +
+  #change legend title
+  labs(fill = "Women every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Scotland")+
+  #customize theme
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  
+
+```
+
+## Focus on Edinburgh
+
+```{r}
+#filter the data
+ward_data_geo %>%
+  filter(Council %in% c("City of Edinburgh")) %>%
+  ggplot() +
+  geom_sf(aes(fill = C1_gap),
+          colour = "white") +
+  scale_fill_gradientn(
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+            ) +
+  theme_void() +
+  ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("grey60", "white")
+    ) +
+  labs(fill = "Women every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Edinburgh")+
+  #customize theme
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  
+```
+
+## Preparing data to add ward labels
+
+```{r echo=TRUE}
+#create polygon centroids to be used as location for the labels
+label_poi <- ward_data_geo %>%
+  filter(Council %in% c("City of Edinburgh")) %>%
+  st_centroid()
+
+#add long lat field
+label_poi <- label_poi %>%
+  mutate(LONG=as.numeric(st_coordinates(label_poi)[,1]),
+         LAT=as.numeric(st_coordinates(label_poi)[,2]))
+
+names(label_poi)
+
+```
+
+## Let's add the labels to the map
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "1-24"
+#filter the data
+ward_data_geo %>%
+  filter(Council %in% c("City of Edinburgh")) %>%
+  ggplot() +
+  geom_sf(aes(fill = C1_gap),
+          colour = "#f5f5f2") +
+  scale_fill_gradientn(
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  theme_void() +
+  ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("grey60", "white")
+    ) +
+  labs(fill = "Women for every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Edinburgh")+
+  #customize theme
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  +
+  #add labels
+  geom_sf(data = label_poi, color="NA")+
+  ggrepel::geom_text_repel(mapping = aes(x=LONG,
+                                         y=LAT,
+                                         label=Name), 
+                           data = label_poi,
+                           size=2,
+                           color = "white",     # text color
+                           bg.color = "grey30", # shadow color
+                           bg.r = 0.15,
+                           max.overlaps=Inf,
+                           segment.color = "black")
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "25-36"
+#filter the data
+ward_data_geo %>%
+  filter(Council %in% c("City of Edinburgh")) %>%
+  ggplot() +
+  geom_sf(aes(fill = C1_gap),
+          colour = "#f5f5f2") +
+  scale_fill_gradientn(
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  theme_void() +
+  ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("grey60", "white")
+    ) +
+  labs(fill = "Women for every 100 Men\nin Higher Managerial Roles",
+       title = "Gender Inequality in Edinburgh")+
+  #customize theme
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    )  +
+  #add labels
+  geom_sf(data = label_poi, color="NA")+
+  ggrepel::geom_text_repel(mapping = aes(x=LONG,
+                                         y=LAT,
+                                         label=Name), 
+                           data = label_poi,
+                           size=2,
+                           color = "white",     # text color
+                           bg.color = "grey30", # shadow color
+                           bg.r = 0.15,
+                           max.overlaps=Inf,
+                           segment.color = "black")
+```
+
+## and see the result
+
+```{r echo=FALSE}
+ward_data_geo %>%
+  filter(Council %in% c("City of Edinburgh")) %>%
+  ggplot() +
+  geom_sf(aes(fill = C1_gap),
+          colour = "#f5f5f2") +
+  scale_fill_gradientn(
+            colors = c("#0002A1", "#332FD0", "#FB2576", "#3F0071")
+                ) +
+  theme_void() +
+  ggspatial::annotation_scale(
+    location = "br",
+    bar_cols = c("grey60", "white")
+    ) +
+  labs(fill = "Number of Women for every\n10 Men in Managerial Roles")+
+  theme(
+    text = element_text(family = "Futura-Medium",color = "#22211d"),
+    legend.title = element_text(family = "Futura-Bold", size = 10),
+    legend.text = element_text(family = "Futura-Medium", size = 10),
+    plot.background = element_rect(fill = "#f5f5f2", color = NA),
+    panel.background = element_rect(fill = "#f5f5f2", color = NA)
+    ) +
+  geom_sf(data = label_poi, color="NA")+
+  ggrepel::geom_text_repel(mapping = aes(x=LONG,
+                                         y=LAT,
+                                         label=Name), 
+                           data = label_poi,
+                           size=2.5,
+                           color = "white",     # text color
+                           bg.color = "grey30", # shadow color
+                           bg.r = 0.15,
+                           max.overlaps=Inf,
+                           segment.color = "black")
+```
+
+# Let's add some interactivity {background-color="#562457"}
+
+## Interactive maps with leaflet
+
+Leaflet is JavaScript library for mobile-friendly interactive maps.
+
+This R package makes it easy to integrate and control Leaflet maps in R.
+
+After installed you can load it:
+
+```{r, echo=TRUE}
+library(leaflet)
+```
+
+## Some data prep
+
+```{r, echo=TRUE}
+#transform CRS to make it compatible with global map tiles prividers
+ward_data_geo <- st_transform(ward_data_geo, 4326) %>%
+  st_make_valid() %>%
+  st_simplify()
+
+#find centroid of Scotland to center the first view
+scotland_ct <- ward_data_geo %>%
+  st_make_valid() %>%
+  st_union() %>%
+  st_centroid()
+```
+
+## Basic example
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "1-2"
+leaflet() %>%
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # add the polygons of the clusters
+  addPolygons(
+    data = ward_data_geo,
+    color = "#E2E2E2",
+    # set the opacity of the outline
+    opacity = 1,
+    # set the stroke width in pixels
+    weight = 1,
+    # set the fill opacity
+    fillOpacity = 0.2
+  ) 
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "3-4"
+leaflet() %>%
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # add the polygons of the clusters
+  addPolygons(
+    data = ward_data_geo,
+    color = "#E2E2E2",
+    # set the opacity of the outline
+    opacity = 1,
+    # set the stroke width in pixels
+    weight = 1,
+    # set the fill opacity
+    fillOpacity = 0.2
+  ) 
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "5-15"
+leaflet() %>%
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # add the polygons of the clusters
+  addPolygons(
+    data = ward_data_geo,
+    color = "#E2E2E2",
+    # set the opacity of the outline
+    opacity = 1,
+    # set the stroke width in pixels
+    weight = 1,
+    # set the fill opacity
+    fillOpacity = 0.2
+  ) 
+
+```
+
+## Let's see what we get
+
+```{r}
+#| code-line-numbers: "1-2"
+leaflet() %>%
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # add the polygons of the clusters
+  addPolygons(
+    data = ward_data_geo,
+    color = "#E2E2E2",
+    # set the opacity of the outline
+    opacity = 1,
+    # set the stroke width in pixels
+    weight = 1,
+    # set the fill opacity
+    fillOpacity = 0.2
+  ) 
+
+```
+
+## Add fill and legend
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "1-2"
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "3-7"
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "8-18"
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+
+```
+
+## 
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "19-23"
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+
+```
+
+## 
+
+```{r}
+#| code-line-numbers: "19-23"
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+
+```
+
+## Add popup
+
+```{r, echo=TRUE, eval=FALSE}
+#| code-line-numbers: "20-25"
+
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8,
+    # add popup
+    popup = paste('<strong>',"Gap: ",'</strong>', round(ward_data_geo$C1_gap), "<br>",
+                  '<strong>',"Ward Name:",'<strong>', ward_data_geo$Name, "<br>",
+                  '<strong>',"Council: ",'<strong>', ward_data_geo$Council, "<br>")
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+```
+
+## 
+
+```{r}
+bins <- c(35, 45, 55, 65, 75, 85)
+pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
+leaflet(ward_data_geo) %>%
+  # center the map view
+  setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
+  # add a dark basemap
+  addProviderTiles("CartoDB.DarkMatter") %>%
+  # change polygon fill
+  addPolygons(
+    # set the opacity of the outline
+    opacity = 0,
+    # set the stroke width in pixels
+    weight = 0.1,
+    # set fill colors
+    fillColor = ~pal(C1_gap),
+    # set the fill opacity
+    fillOpacity = 0.8,
+    # add popup
+    popup = paste('<strong>',"Gap: ",'</strong>', round(ward_data_geo$C1_gap), "<br>",
+                  '<strong>',"Ward Name:",'</strong>', ward_data_geo$Name, "<br>",
+                  '<strong>',"Council: ",'</strong>', ward_data_geo$Council, "<br>")
+  ) %>%
+  addLegend(pal = pal, 
+            values = ~C1_gap, 
+            opacity = 0.7,
+            position = "bottomright",
+            title = "Women every 100 Men</br>in Higher Managerial Roles")
+
+```
+
+## Conclusions
+
+-   These are **not research results**, but just some quick data exploration to showcase the **R magic** !
+
+. . .
+
+-   **More affluent** and urban areas seem to have **lower differences** between women and men.
+
+. . .
+
+-   It would be interesting to explore this more as it demonstrate the importance of **intersectional feminism** perspectives.
+
+. . .
+
+-   There are **many more** ways/libraries that can be used to make maps.
+
+. . .
+
+-   Hope you enjoyed the tutorial
+
+## As always
+
+![](smash.gif){.absolute top="100" left="100" height="300"}
+
+## Contacts
+
+acalafio\@ed.ac.uk
+
+@alel_domi
+
+@alel\@datasci.social
