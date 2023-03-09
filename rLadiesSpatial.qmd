@@ -105,7 +105,7 @@ st_crs(boundaries_WGS84)[[1]]
 
 ## Spatial Join
 
-Spatial joins are useful when you want to **join attributes** of one sf obj with an other object based on some geometry operation.
+Spatial joins are useful when you want to **join attributes** of one sf obj with an other object based on geometry operations.
 
 ```{r echo=TRUE}
 pts <- st_sample(boundaries[1:2, ], 10) # creates sample points within boundaries
@@ -573,7 +573,7 @@ ward_data_geo %>%
 
 Leaflet is JavaScript library for mobile-friendly interactive maps.
 
-This R package makes it easy to integrate and control Leaflet maps in R.
+The R package makes it easy to integrate and control Leaflet maps in R.
 
 After installed you can load it:
 
@@ -604,7 +604,7 @@ leaflet() %>%
   setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
   # add a dark basemap
   addProviderTiles("CartoDB.DarkMatter") %>%
-  # add the polygons of the clusters
+  # add the polygons
   addPolygons(
     data = ward_data_geo,
     color = "#E2E2E2",
@@ -626,7 +626,7 @@ leaflet() %>%
   setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
   # add a dark basemap
   addProviderTiles("CartoDB.DarkMatter") %>%
-  # add the polygons of the clusters
+  # add the polygons
   addPolygons(
     data = ward_data_geo,
     color = "#E2E2E2",
@@ -648,7 +648,7 @@ leaflet() %>%
   setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
   # add a dark basemap
   addProviderTiles("CartoDB.DarkMatter") %>%
-  # add the polygons of the clusters
+  # add the polygons
   addPolygons(
     data = ward_data_geo,
     color = "#E2E2E2",
@@ -670,7 +670,7 @@ leaflet() %>%
   setView(scotland_ct[[1]][1], scotland_ct[[1]][2], zoom = 6) %>%
   # add a dark basemap
   addProviderTiles("CartoDB.DarkMatter") %>%
-  # add the polygons of the clusters
+  # add the polygons
   addPolygons(
     data = ward_data_geo,
     color = "#E2E2E2",
@@ -842,7 +842,7 @@ leaflet(ward_data_geo) %>%
 ## Add popup
 
 ```{r, echo=TRUE, eval=FALSE}
-#| code-line-numbers: "20-25"
+#| code-line-numbers: "18-22"
 
 bins <- c(35, 45, 55, 65, 75, 85)
 pal <- colorBin(c("#0002A1", "#332FD0", "#FB2576", "#3F0071"), domain = ward_data_geo$C1_gap, bins = bins)
