@@ -917,7 +917,7 @@ leaflet(ward_data_geo) %>%
 
 . . .
 
--   It would be interesting to explore this more as it demonstrate the importance of **intersectional feminism** perspectives.
+-   It would be interesting to explore this more as it demonstrates the importance of **intersectional feminism** perspectives.
 
 . . .
 
