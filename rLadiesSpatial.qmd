@@ -863,8 +863,8 @@ leaflet(ward_data_geo) %>%
     fillOpacity = 0.8,
     # add popup
     popup = paste('<strong>',"Gap: ",'</strong>', round(ward_data_geo$C1_gap), "<br>",
-                  '<strong>',"Ward Name:",'<strong>', ward_data_geo$Name, "<br>",
-                  '<strong>',"Council: ",'<strong>', ward_data_geo$Council, "<br>")
+                  '<strong>',"Ward Name:",'</strong>', ward_data_geo$Name, "<br>",
+                  '<strong>',"Council: ",'</strong>', ward_data_geo$Council, "<br>")
   ) %>%
   addLegend(pal = pal, 
             values = ~C1_gap, 
